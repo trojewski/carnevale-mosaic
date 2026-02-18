@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mosaic</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #F4F1ED;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .mosaic {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      perspective: 1200px;
+      perspective-origin: 50% 50%;
+    }
+
+    .mosaic-tile {
+      position: absolute;
+      overflow: hidden;
+      border-radius: 16px;
+      transform: translateZ(var(--tz, 0px)) scale(var(--scale, 0.92));
+      transition: opacity 100ms ease, transform 150ms ease-out;
+      will-change: transform, opacity, filter;
+      opacity: 0;
+      filter: blur(var(--dof-blur, 0px));
+    }
+
+    .mosaic-tile.visible {
+      --scale: 1;
+      opacity: 1;
+    }
+
+    .mosaic-tile::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: #F4F1ED;
+      opacity: var(--fade, 0);
+      pointer-events: none;
+    }
+
+    .mosaic-tile img,
+    .mosaic-tile video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .hero-text {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      max-width: 480px;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .hero-text h1 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 64px;
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1.15;
+      margin-bottom: 12px;
+    }
+
+    .hero-text p {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 768px) {
+      .hero-text h1 {
+        font-size: 36px;
+        line-height: 1.2;
+      }
+
+      .hero-text p {
+        font-size: 17px;
+        line-height: 1.5;
+      }
+    }
+
+    .tags-bar {
+      position: fixed;
+      bottom: 152px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .tag-pill {
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .tag-pill:hover {
+      background: rgba(255, 255, 255, 0.8);
+      border-color: rgba(0, 0, 0, 0.25);
+    }
+
+    .prompt-bar {
+      position: fixed;
+      bottom: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: min(600px, calc(100vw - 48px));
+    }
+
+    .prompt-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 10px 10px 24px;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 34px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06),
+                  0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .prompt-inner input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 22px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.4;
+    }
+
+    .prompt-inner input::placeholder {
+      color: #999;
+    }
+
+    .prompt-submit {
+      flex-shrink: 0;
+      width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: 50%;
+      background: #1a1a1a;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+    }
+
+    .prompt-submit:hover {
+      background: #333;
+    }
+
+    #nav-logo {
+      position: fixed;
+      top: 64px;
+      left: 64px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 48px;
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 9999px;
+    }
+
+    #nav-logo img {
+      max-height: 20px;
+      width: auto;
+      display: block;
+      filter: brightness(0);
+    }
+
+    #main-nav {
+      position: fixed;
+      top: 64px;
+      right: 64px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      height: 48px;
+      padding: 0 8px;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 9999px;
+      gap: 0;
+    }
+
+    #main-nav a {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+      text-decoration: none;
+      padding: 0 16px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s ease;
+    }
+
+    #main-nav a:hover {
+      color: #1a1a1a;
+    }
+
+    .nav-menu-btn {
+      display: none;
+      position: fixed;
+      top: 64px;
+      right: 64px;
+      z-index: 1000;
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      border-radius: 9999px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      transition: background 0.2s ease;
+    }
+
+    .nav-menu-btn:hover {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .nav-menu-icon {
+      width: 24px;
+      height: 24px;
+      stroke: rgba(0, 0, 0, 0.6);
+      stroke-width: 2;
+      stroke-linecap: round;
+      fill: none;
+    }
+
+    .nav-menu-btn:hover .nav-menu-icon {
+      stroke: #1a1a1a;
+    }
+
+    @media (max-width: 768px) {
+      #main-nav {
+        display: none;
+      }
+
+      .nav-menu-btn {
+        display: flex;
+      }
+    }
+
+    .hero-text,
+    .tags-bar,
+    .prompt-bar {
+      transition: opacity 400ms ease;
+    }
+
+    .hero-text.fade-out,
+    .tags-bar.fade-out,
+    .prompt-bar.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mosaic.mosaic-dimmed {
+      opacity: 0.2;
+      transition: opacity 400ms ease;
+    }
+
+    .mosaic-tile.tile-fade-out {
+      opacity: 0 !important;
+      transition: opacity 300ms ease !important;
+    }
+
+    .mosaic-tile.tile-fade-in {
+      transition: opacity 400ms ease !important;
+    }
+
+    .flying-image {
+      position: fixed;
+      z-index: 1100;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: left 1000ms cubic-bezier(0.23, 1, 0.32, 1),
+                  top 1000ms cubic-bezier(0.23, 1, 0.32, 1),
+                  width 1000ms cubic-bezier(0.23, 1, 0.32, 1),
+                  height 1000ms cubic-bezier(0.23, 1, 0.32, 1);
+      pointer-events: none;
+    }
+
+    .flying-image img,
+    .flying-image video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .results-page {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      overflow-y: auto;
+      padding: 144px 64px 144px;
+      pointer-events: none;
+      visibility: hidden;
+      background: transparent;
+    }
+
+    .results-page.laid-out {
+      visibility: visible;
+      pointer-events: auto;
+      opacity: 1;
+      transition: opacity 300ms ease;
+      background: transparent;
+    }
+
+    .results-page.fade-out {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+
+    .results-page .results-hero-img {
+      width: 100%;
+      border-radius: 16px;
+      display: block;
+      margin-bottom: 32px;
+      opacity: 0;
+    }
+
+    .results-page .results-hero-video {
+      object-fit: cover;
+    }
+
+    .results-page .results-hero-caption {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #6b6b6b;
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
+
+    .results-page.hero-landed .results-hero-img {
+      opacity: 1;
+    }
+
+    .results-page .results-card img[data-fly-src] {
+      opacity: 0;
+    }
+
+    .results-page.hero-landed .results-card img[data-fly-src] {
+      opacity: 1;
+    }
+
+    .results-intro-row {
+      margin-bottom: 32px;
+    }
+
+    .results-page .results-intro-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      font-weight: 400;
+      color: #555;
+      line-height: 1.6;
+      margin: 0 0 16px 0;
+    }
+
+    .results-page .results-subhead {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-top: 64px;
+      margin-bottom: 20px;
+    }
+
+    .results-insights-section {
+      margin-top: 72px;
+    }
+
+    .results-contact {
+      margin-top: 64px;
+      padding: 32px;
+      position: relative;
+      border-radius: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .results-contact-action {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 24px;
+    }
+
+    .results-contact-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1.2;
+      margin: 0;
+      text-align: center;
+    }
+
+    .results-contact-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 48px;
+      padding: 0 18px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      background: #1a1a1a;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .results-contact-btn:hover {
+      background: #333;
+    }
+
+    .results-page .results-title,
+    .results-page .results-intro-row,
+    .results-page .results-hero-caption,
+    .results-page .results-subhead,
+    .results-page .results-intro-text,
+    .results-page .results-insights-section,
+    .results-page .results-carousel,
+    .results-page .results-grid,
+    .results-page .results-contact {
+      opacity: 0;
+      transition: opacity 400ms ease;
+    }
+
+    .results-page.content-visible .results-title,
+    .results-page.content-visible .results-intro-row,
+    .results-page.content-visible .results-hero-caption,
+    .results-page.content-visible .results-subhead,
+    .results-page.content-visible .results-intro-text,
+    .results-page.content-visible .results-insights-section,
+    .results-page.content-visible .results-carousel,
+    .results-page.content-visible .results-grid,
+    .results-page.content-visible .results-contact {
+      opacity: 1;
+    }
+
+    .results-page .results-inner {
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .results-title-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .results-page .results-title {
+      grid-column: 2 / -1;
+      padding: 32px 40px;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 4px;
+    }
+
+    .results-page .results-title::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 4px;
+      z-index: -1;
+    }
+
+    .results-page .results-title p {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      font-weight: 400;
+      color: #555;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .results-inline-tag {
+      display: inline-block;
+      position: relative;
+      padding: 0 6px;
+      margin-left: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.5;
+      color: #1a1a1a;
+      text-decoration: none;
+      border-radius: 4px;
+      overflow: hidden;
+      vertical-align: baseline;
+    }
+
+    .results-inline-tag::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 4px;
+      z-index: -1;
+      transition: background 0.2s ease;
+    }
+
+    .results-inline-tag:hover {
+      color: #333;
+    }
+
+    .results-inline-tag:hover::before {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .results-inline-tag-arrow {
+      width: 10px;
+      height: 10px;
+      vertical-align: middle;
+      margin-left: 2px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .results-grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+    }
+
+    .results-carousel {
+      position: relative;
+      margin-top: 24px;
+    }
+
+    .results-carousel-viewport {
+      overflow: hidden;
+    }
+
+    .results-carousel .results-carousel-track.results-grid {
+      display: flex;
+      flex-wrap: nowrap;
+      grid-template-columns: unset;
+      margin-top: 0;
+      gap: 24px;
+      transition: transform 0.35s ease;
+      transform: translateX(calc(-1 * var(--carousel-index, 0) * (50% + 12px)));
+    }
+
+    .results-carousel .results-carousel-track .results-card {
+      flex: 0 0 calc(50% - 12px);
+      min-width: 0;
+    }
+
+    .results-carousel-arrow {
+      position: absolute;
+      top: 41%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .results-carousel-arrow:hover {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .results-carousel-arrow svg {
+      width: 20px;
+      height: 20px;
+      stroke: #333;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .results-carousel-prev {
+      left: -22px;
+    }
+
+    .results-carousel-next {
+      right: -22px;
+    }
+
+    .results-carousel-arrow:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .results-carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .results-carousel-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: none;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .results-carousel-dot:hover {
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .results-carousel-dot.active {
+      background: rgba(0, 0, 0, 0.6);
+      transform: scale(1.2);
+    }
+
+    .results-carousel-dot-third {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .results-carousel .results-carousel-track.results-grid {
+        transform: translateX(calc(-1 * var(--carousel-index, 0) * (100% + 24px)));
+      }
+
+      .results-carousel .results-carousel-track .results-card {
+        flex: 0 0 100%;
+      }
+
+      .results-carousel-dot-third {
+        display: block;
+      }
+    }
+
+    .results-card img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      display: block;
+      border-radius: 16px;
+    }
+
+    .results-card .card-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+      padding: 12px 0 0 0;
+      line-height: 1.4;
+    }
+
+    .retry-bar {
+      position: fixed;
+      bottom: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 400ms ease;
+    }
+
+    .retry-bar.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .retry-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 999px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .retry-btn:hover {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .prompt-submit svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+  <div id="nav-logo">
+    <img src="../Logo-Tetris/Carnevale_Logo_White.png" alt="Carnevale">
+  </div>
+
+  <nav id="main-nav">
+    <a href="#">Work</a>
+    <a href="#">Services</a>
+    <a href="#">About</a>
+    <a href="#">Contact</a>
+  </nav>
+
+  <button type="button" id="nav-menu-btn" class="nav-menu-btn" aria-label="Open menu">
+    <svg class="nav-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+
+  <div class="mosaic" id="mosaic"></div>
+
+  <div class="hero-text" id="hero-text">
+    <h1>We&rsquo;re bringing the future to life.</h1>
+    <p>Describe the kind of work do you want to see, or use the common searches below.</p>
+  </div>
+
+  <div class="tags-bar" id="tags-bar">
+    <span class="tag-pill">3D and Extended Reality</span>
+    <span class="tag-pill" id="tag-mobile">Mobile and Web Apps</span>
+    <span class="tag-pill">Digital Exhibits</span>
+  </div>
+
+  <div class="prompt-bar" id="prompt-bar">
+    <div class="prompt-inner">
+      <input type="text" id="prompt-input" placeholder="Ask anything.">
+      <button class="prompt-submit" id="prompt-submit" aria-label="Submit">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="retry-bar" id="retry-bar">
+    <button class="retry-btn" id="retry-btn">Try Another Prompt</button>
+  </div>
+
+  <div class="results-page" id="results-page">
+    <div class="results-inner">
+      <div class="results-title-row">
+        <div class="results-title">
+          <p>Tell me about mobile and web apps.</p>
+        </div>
+      </div>
+      <div class="results-intro-row">
+        <h2 class="results-subhead">Our Web and Mobile Philosophy</h2>
+        <p class="results-intro-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+        <p class="results-intro-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. <a href="#" class="results-inline-tag">View Our Services <svg class="results-inline-tag-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a></p>
+        </div>
+      <video class="results-hero-img results-hero-video" data-fly-src="mobile-web-apps.mp4" src="mobile-web-apps.mp4" muted loop playsinline autoplay aria-label="Mobile and Web Apps"></video>
+      <p class="results-hero-caption">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+      <h2 class="results-subhead">Related Work</h2>
+      <p class="results-intro-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. <a href="#" class="results-inline-tag">View All Work <svg class="results-inline-tag-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a></p>
+      <div class="results-carousel">
+        <button type="button" class="results-carousel-arrow results-carousel-prev" aria-label="Previous">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <button type="button" class="results-carousel-arrow results-carousel-next" aria-label="Next">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        <div class="results-carousel-viewport">
+          <div class="results-carousel-track results-grid">
+            <div class="results-card">
+              <img data-fly-src="Honda.png" src="Honda.png" alt="Honda">
+              <div class="card-title">Honda: Turning tech utility into brand storytelling</div>
+            </div>
+            <div class="results-card">
+              <img data-fly-src="Steelcase.webp" src="Steelcase.webp" alt="Steelcase">
+              <div class="card-title">Steelcase: Personalizing home office furniture customization</div>
+            </div>
+            <div class="results-card">
+              <img data-fly-src="Traeger.jpg" src="Traeger.jpg" alt="Traeger">
+              <div class="card-title">Traeger: Technology. Fire. Meat. Happiness.</div>
+            </div>
+          </div>
+        </div>
+        <div class="results-carousel-dots" role="tablist" aria-label="Carousel pages">
+          <button type="button" class="results-carousel-dot" role="tab" aria-selected="true" aria-label="Page 1"></button>
+          <button type="button" class="results-carousel-dot" role="tab" aria-selected="false" aria-label="Page 2"></button>
+          <button type="button" class="results-carousel-dot results-carousel-dot-third" role="tab" aria-selected="false" aria-label="Page 3"></button>
+        </div>
+      </div>
+      <div class="results-insights-section">
+        <h2 class="results-subhead">Related Insights</h2>
+        <p class="results-intro-text">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Curabitur pretium tincidunt lacus nulla facilisi. <a href="#" class="results-inline-tag">View All Insights <svg class="results-inline-tag-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a></p>
+        <div class="results-carousel">
+          <button type="button" class="results-carousel-arrow results-carousel-prev" aria-label="Previous">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+          <button type="button" class="results-carousel-arrow results-carousel-next" aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+          <div class="results-carousel-viewport">
+            <div class="results-carousel-track results-grid">
+              <div class="results-card">
+                <img data-fly-src="accessibility-1.gif" src="accessibility-1.gif" alt="Accessibility">
+                <div class="card-title">You, Me, and Accessibility in 3D Pt. 7: Designing A Strategic Process</div>
+              </div>
+              <div class="results-card">
+                <img data-fly-src="caitlyn-interview.png" src="caitlyn-interview.png" alt="Caitlyn interview">
+                <div class="card-title">How the Deaf Community Navigates Digital Experiences</div>
+              </div>
+              <div class="results-card">
+                <img data-fly-src="GenAI.jpg" src="GenAI.jpg" alt="GenUI">
+                <div class="card-title">GenUI: Every Experience Becomes Concierge</div>
+              </div>
+            </div>
+          </div>
+          <div class="results-carousel-dots" role="tablist" aria-label="Carousel pages">
+            <button type="button" class="results-carousel-dot" role="tab" aria-selected="true" aria-label="Page 1"></button>
+            <button type="button" class="results-carousel-dot" role="tab" aria-selected="false" aria-label="Page 2"></button>
+            <button type="button" class="results-carousel-dot results-carousel-dot-third" role="tab" aria-selected="false" aria-label="Page 3"></button>
+          </div>
+        </div>
+      </div>
+      <div class="results-contact">
+        <div class="results-contact-content">
+          <h2 class="results-contact-title">Let&rsquo;s explore how to bring your future to life.</h2>
+        </div>
+        <div class="results-contact-action">
+          <button type="button" class="results-contact-btn">Schedule a Call</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const images = [
+      'mobile-web-apps.mp4',
+      'Absurd.jpg',
+      'Disaster-Relief.png',
+      'GHSP-Cooktop.jpg',
+      'GRCM.jpg',
+      'GenAI.jpg',
+      'Honda.png',
+      'Outdoor-Lighting.png',
+      'Rockford-Construction.jpg',
+      'Rockstar-Games.webp',
+      'SkyLens-video.gif',
+      'Skylens.jpg',
+      'Steelcase-Maptable.jpg',
+      'Steelcase.webp',
+      'Traeger.jpg',
+      'accessibility-1.gif',
+      'caitlyn-interview.png',
+      'machine-collaboration.png',
+      'nSpectre.webp',
+      'oyaji.gif'
+    ];
+
+    const DEPTH_LAYERS = 5;
+    const Z_STEP = 100;
+    const MAX_Z = (DEPTH_LAYERS - 1) * Z_STEP;
+    const PERSPECTIVE = 1200;
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function randInt(min, max) {
+      return Math.floor(rand(min, max + 1));
+    }
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function buildMosaic() {
+      const mosaic = document.getElementById('mosaic');
+      mosaic.innerHTML = '';
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const shuffled = shuffle(images);
+      const placed = [];
+
+      shuffled.forEach((src) => {
+        const layer = randInt(0, DEPTH_LAYERS - 1);
+        const z = layer * Z_STEP;
+        const depthRatio = z / MAX_Z;
+
+        const minApparent = 200;
+        const maxApparent = 350;
+        const apparentW = rand(
+          minApparent + (1 - depthRatio) * 60,
+          maxApparent - depthRatio * 60
+        );
+
+        const perspectiveShrink = PERSPECTIVE / (PERSPECTIVE + z);
+        const w = Math.round(apparentW / perspectiveShrink);
+
+        const fade = 0.7 + depthRatio * 0.25;
+        const blur = depthRatio * 6;
+
+        let x, y, attempts = 0;
+        const padding = 20;
+        const estApparentH = apparentW * 0.7;
+        do {
+          x = rand(-apparentW * 0.15, vw - apparentW * 0.85);
+          y = rand(-estApparentH * 0.15, vh - estApparentH * 0.85);
+          attempts++;
+        } while (attempts < 80 && hasOverlap(x, y, apparentW, estApparentH, placed, padding));
+
+        placed.push({ x, y, w: apparentW, h: estApparentH });
+
+        const tile = document.createElement('div');
+        tile.className = 'mosaic-tile';
+        tile.style.width = w + 'px';
+        tile.style.left = x + 'px';
+        tile.style.top = y + 'px';
+        tile.style.zIndex = DEPTH_LAYERS - layer;
+        tile.style.setProperty('--tz', `${-z}px`);
+        tile.style.setProperty('--fade', fade);
+        tile.style.setProperty('--dof-blur', blur + 'px');
+
+        const isVideo = /\.(mp4|webm|ogg)$/i.test(src);
+        if (isVideo) {
+          const video = document.createElement('video');
+          video.src = src;
+          video.muted = true;
+          video.loop = true;
+          video.playsInline = true;
+          video.autoplay = true;
+          video.setAttribute('aria-label', src.split('.')[0].replace(/-/g, ' '));
+          tile.dataset.layer = layer;
+          tile.dataset.src = src;
+          tile.appendChild(video);
+        } else {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = src.split('.')[0].replace(/-/g, ' ');
+          img.loading = 'eager';
+          tile.dataset.layer = layer;
+          tile.dataset.src = src;
+          tile.appendChild(img);
+        }
+        mosaic.appendChild(tile);
+      });
+
+      const tiles = Array.from(mosaic.querySelectorAll('.mosaic-tile'));
+      tiles.sort((a, b) => b.dataset.layer - a.dataset.layer);
+      tiles.forEach((tile, i) => {
+        setTimeout(() => tile.classList.add('visible'), i * 10);
+      });
+    }
+
+    function hasOverlap(x, y, w, h, placed, padding) {
+      for (const p of placed) {
+        if (
+          x < p.x + p.w + padding &&
+          x + w + padding > p.x &&
+          y < p.y + p.h + padding &&
+          y + h + padding > p.y
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    buildMosaic();
+    window.addEventListener('resize', buildMosaic);
+
+    function showResults() {
+      const heroText = document.getElementById('hero-text');
+      const tagsBar = document.getElementById('tags-bar');
+      const promptBar = document.getElementById('prompt-bar');
+      const resultsPage = document.getElementById('results-page');
+      const mosaic = document.getElementById('mosaic');
+
+      heroText.classList.add('fade-out');
+      tagsBar.classList.add('fade-out');
+      promptBar.classList.add('fade-out');
+
+      const flyTargets = resultsPage.querySelectorAll('[data-fly-src]');
+
+      setTimeout(() => {
+        resultsPage.scrollTop = 0;
+        resultsPage.classList.add('laid-out');
+        mosaic.classList.add('mosaic-dimmed');
+
+        const flyingEls = [];
+        flyTargets.forEach((targetEl) => {
+          const src = targetEl.getAttribute('data-fly-src');
+          const tile = mosaic.querySelector('[data-src="' + src + '"]');
+          if (!tile) return;
+
+          const tileRect = tile.getBoundingClientRect();
+          const targetRect = targetEl.getBoundingClientRect();
+
+          const flyEl = document.createElement('div');
+          flyEl.className = 'flying-image';
+          flyEl.style.left = tileRect.left + 'px';
+          flyEl.style.top = tileRect.top + 'px';
+          flyEl.style.width = tileRect.width + 'px';
+          flyEl.style.height = tileRect.height + 'px';
+
+          const isVideo = /\.(mp4|webm|ogg)$/i.test(src);
+          if (isVideo) {
+            const video = document.createElement('video');
+            video.src = src;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.setAttribute('aria-label', src.split('.')[0].replace(/-/g, ' '));
+            flyEl.appendChild(video);
+          } else {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = src.split('.')[0].replace(/-/g, ' ');
+            flyEl.appendChild(img);
+          }
+
+          document.body.appendChild(flyEl);
+          flyingEls.push({ el: flyEl, targetRect });
+          tile.classList.add('tile-fade-out');
+        });
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            flyingEls.forEach(({ el, targetRect }) => {
+              el.style.left = targetRect.left + 'px';
+              el.style.top = targetRect.top + 'px';
+              el.style.width = targetRect.width + 'px';
+              el.style.height = targetRect.height + 'px';
+            });
+          });
+        });
+
+        setTimeout(() => {
+          resultsPage.classList.add('hero-landed');
+          resultsPage.classList.add('content-visible');
+          document.getElementById('retry-bar').classList.add('visible');
+          document.querySelectorAll('.flying-image').forEach((el) => el.remove());
+        }, 1000);
+      }, 300);
+    }
+
+    function hideResults() {
+      const heroText = document.getElementById('hero-text');
+      const tagsBar = document.getElementById('tags-bar');
+      const promptBar = document.getElementById('prompt-bar');
+      const resultsPage = document.getElementById('results-page');
+      const retryBar = document.getElementById('retry-bar');
+      const mosaic = document.getElementById('mosaic');
+
+      const FADE_OUT_MS = 300;
+      const DELAY_BEFORE_FADE_IN_MS = 50;
+
+      resultsPage.classList.add('fade-out');
+      retryBar.classList.remove('visible');
+
+      setTimeout(() => {
+        resultsPage.classList.remove('content-visible');
+        resultsPage.classList.remove('hero-landed');
+        resultsPage.classList.remove('laid-out');
+        resultsPage.classList.remove('fade-out');
+        mosaic.classList.remove('mosaic-dimmed');
+      }, FADE_OUT_MS);
+
+      setTimeout(() => {
+        const allTiles = mosaic.querySelectorAll('.mosaic-tile');
+        allTiles.forEach((tile) => tile.classList.add('tile-fade-in'));
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            allTiles.forEach((tile) => tile.classList.remove('tile-fade-out'));
+            heroText.classList.remove('fade-out');
+            tagsBar.classList.remove('fade-out');
+            promptBar.classList.remove('fade-out');
+            setTimeout(() => {
+              allTiles.forEach((tile) => tile.classList.remove('tile-fade-in'));
+            }, 450);
+          });
+        });
+      }, FADE_OUT_MS + DELAY_BEFORE_FADE_IN_MS);
+    }
+
+    document.getElementById('prompt-submit').addEventListener('click', showResults);
+
+    document.getElementById('prompt-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') showResults();
+    });
+
+    document.getElementById('tag-mobile').addEventListener('click', showResults);
+
+    document.getElementById('retry-btn').addEventListener('click', hideResults);
+
+    (function initResultsCarousels() {
+      const carousels = document.querySelectorAll('.results-carousel');
+      const totalSlides = 3;
+      function getMaxIndex() {
+        return window.innerWidth <= 768 ? totalSlides - 1 : totalSlides - 2;
+      }
+      carousels.forEach((carousel) => {
+        const track = carousel.querySelector('.results-carousel-track');
+        const prevBtn = carousel.querySelector('.results-carousel-prev');
+        const nextBtn = carousel.querySelector('.results-carousel-next');
+        const dots = Array.from(carousel.querySelectorAll('.results-carousel-dot'));
+        if (!track || !prevBtn || !nextBtn) return;
+        function setIndex(i) {
+          const maxIndex = getMaxIndex();
+          let index = i;
+          if (index < 0) index = maxIndex;
+          if (index > maxIndex) index = 0;
+          track.style.setProperty('--carousel-index', String(index));
+          prevBtn.disabled = false;
+          nextBtn.disabled = false;
+          dots.forEach((dot, d) => {
+            dot.classList.toggle('active', d === index);
+            dot.setAttribute('aria-selected', d === index ? 'true' : 'false');
+          });
+        }
+        setIndex(0);
+        prevBtn.addEventListener('click', () => {
+          const current = parseInt(track.style.getPropertyValue('--carousel-index') || '0', 10);
+          setIndex(current - 1);
+        });
+        nextBtn.addEventListener('click', () => {
+          const current = parseInt(track.style.getPropertyValue('--carousel-index') || '0', 10);
+          setIndex(current + 1);
+        });
+        dots.forEach((dot, d) => {
+          dot.addEventListener('click', () => setIndex(d));
+        });
+        window.addEventListener('resize', () => {
+          const maxIndex = getMaxIndex();
+          const current = parseInt(track.style.getPropertyValue('--carousel-index') || '0', 10);
+          setIndex(current > maxIndex ? maxIndex : current);
+        });
+      });
+    })();
+
+    document.addEventListener('mousemove', (e) => {
+      const cx = (e.clientX / window.innerWidth - 0.5) * 2;
+      const cy = (e.clientY / window.innerHeight - 0.5) * 2;
+
+      const tiles = document.querySelectorAll('.mosaic-tile');
+      tiles.forEach((tile) => {
+        const layer = parseInt(tile.dataset.layer) || 0;
+        const strength = (DEPTH_LAYERS - layer) * 8;
+        const tx = cx * strength;
+        const ty = cy * strength;
+        const tz = tile.style.getPropertyValue('--tz') || '0px';
+        const scale = tile.classList.contains('visible') ? 1 : 0.92;
+        tile.style.transform = `translateZ(${tz}) scale(${scale}) translate(${tx}px, ${ty}px)`;
+      });
+    });
+  </script>
+</body>
+</html>
